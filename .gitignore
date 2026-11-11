@@ -37,3 +37,10 @@ src/plan.json
 # Metadatos que Windows añade al copiar archivos
 *Zone.Identifier
 *.gz
+
+# Datos personales: planos reales y proyectos exportados (llevan el plano y las fotos dentro)
+privado/
+plano/
+src/plan_data.py
+proyectos/*.json
+*.dxf

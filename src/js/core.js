@@ -1,7 +1,7 @@
 /* =========================================================================
    Utilidades comunes y almacenamiento (IndexedDB)
    ========================================================================= */
-const SEED = __SEED_JSON__;          // proyecto de ejemplo (la vivienda Tipo 05), generado por build.py
+const SEED = __SEED_JSON__;          // proyecto de ejemplo (src/ejemplo.json, solo geometría)
 const $ = id => document.getElementById(id);
 const fmtM = v => v.toFixed(2).replace('.', ',') + ' m';
 const fmtN = (v,d=2) => (+v).toFixed(d).replace('.', ',');

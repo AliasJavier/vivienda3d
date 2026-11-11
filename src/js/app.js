@@ -264,7 +264,7 @@ async function boot(){
     if(!projList){   // primera vez: crea el proyecto de ejemplo y recupera lo guardado por la versión anterior
       projList=[];
       const old=await idbGet('state');
-      let img=null; try{ const r=await fetch(SEED.image); if(r.ok) img=await r.blob(); }catch(_){}
+      let img=null; if(SEED.image){ try{ const r=await fetch(SEED.image); if(r.ok) img=await r.blob(); }catch(_){} }
       const src=JSON.parse(JSON.stringify(SEED.src));
       const id=await createProject({name:SEED.name,src,design:old||{furniture:sampleFurniture()},imgBlob:img});
       const rec=await idbGet('proj:'+id); rec.view='3d'; await idbPut('proj:'+id,rec);

@@ -167,7 +167,7 @@ const CATALOG = [
 ];
 const COLORS = ['#E4DFD4','#C9B79C','#9C7A55','#6B4E37','#6E7B8C','#3F5E6E','#7C8F6E','#A8492A','#4E4E4E','#F4F4F2'];
 function sampleFurniture(){
-  // ejemplos colocados como en el dibujo del plano
+  // muebles de la vivienda de ejemplo
   return [
     {id:'ej1',type:'sofa', name:'Sofá 3 plazas', w:210,d:85,h:85, x:3.39,z:3.50,rot:90,color:'#6E7B8C'},
     {id:'ej2',type:'table',name:'Mesa comedor',  w:150,d:80,h:75, x:5.12,z:1.61,rot:0, color:'#9C7A55'},

@@ -29,4 +29,4 @@ Cada proyecto guarda dos bloques:
 
 ## Ejemplo incluido
 
-La vivienda Tipo 05 sale de `src/plan_data.py`, medida a mano en píxeles sobre `plano/plano.png`. Al arrancar por primera vez, la app la crea como primer proyecto y recupera el diseño guardado por la versión anterior, si lo había.
+La vivienda de ejemplo está en `src/ejemplo.json`, con el mismo formato `src` que usa el editor (píxeles, sin imagen de fondo). Al arrancar por primera vez, la app lo crea como primer proyecto.

@@ -51,7 +51,7 @@ En la vista 3D, el botón **Exterior** rodea la vivienda de un barrio en movimie
 
 En el panel *Suelos y paredes › Exterior* eliges la planta en la que está la vivienda y hacia qué lado quedan la piscina y la calle. En automático, la piscina queda frente a la terraza más grande y la calle frente a la otra terraza.
 
-Es un decorado genérico de barrio nuevo de Madrid, no una reproducción de la parcela real.
+Es un decorado genérico de barrio residencial nuevo, no una reproducción de ningún sitio real.
 
 ## Realidad virtual (Meta Quest 2)
 
@@ -77,7 +77,7 @@ adb reverse tcp:8000 tcp:8000     # en Windows, con las gafas conectadas y ./ser
 
 Después abre `http://localhost:8000` en el navegador de las gafas.
 
-**Sin cable, con GitHub Pages.** El repositorio incluye `.github/workflows/pages.yml`. Actívalo en GitHub en *Settings › Pages › Source: GitHub Actions* y abre en las gafas `https://USUARIO.github.io/vivienda3d/`. Lo que subas a `proyectos/` queda público.
+**Sin cable, con GitHub Pages.** El repositorio incluye `.github/workflows/pages.yml`. Actívalo en GitHub en *Settings › Pages › Source: GitHub Actions* y abre en las gafas `https://USUARIO.github.io/vivienda3d/`. La web publicada solo lleva la app y la vivienda de ejemplo: para ver otro proyecto en las gafas sin hacerla pública, usa el cable (apartado anterior) o importa el `.json` desde el navegador de las gafas.
 
 **Llevar tu proyecto a las gafas.** Lo guardado en el navegador del ordenador no viaja solo. Exporta el proyecto, deja el `.json` en la carpeta `proyectos/` y abre en las gafas:
 
@@ -117,9 +117,9 @@ src/js/detect.js      detección de muros, huecos y estancias sobre la imagen
 src/js/plan.js        datos del plano (píxeles) -> planta en metros, escala, DXF
 src/js/editor.js      editor 2D del plano
 src/js/app.js         proyectos, vistas Plano/3D, exportar/importar y arranque
-src/plan_data.py      la vivienda de ejemplo (Tipo 05) medida a mano sobre plano/plano.png
-plano/                plano de ejemplo y su DXF
-proyectos/            proyectos exportados para abrir con ?p=proyectos/archivo.json
+src/ejemplo.json      vivienda de ejemplo: solo geometría, sin la imagen del plano
+proyectos/            proyectos exportados para abrir con ?p=proyectos/archivo.json (git no los sube)
+privado/              tus planos y archivos personales (git no los sube)
 ```
 
 Si cambias algo en `src/`, ejecuta `python3 build.py` y recarga el navegador.
@@ -131,3 +131,7 @@ En la consola del navegador, `__vivienda` da acceso al editor y al proyecto abie
 - Las estancias abiertas entre sí (salón con vestíbulo, por ejemplo) salen juntas. Sepáralas con *Estancia a mano*.
 - No admite `.glb` con compresión Draco.
 - Las medidas IKEA son de ikea.com/es (septiembre de 2026). Compruébalas antes de comprar.
+
+## Privacidad
+
+El repositorio no contiene ninguna imagen de plano: la vivienda de ejemplo es solo geometría. Tus planos, fotos y muebles se guardan solo en tu navegador, y los `.json` que exportes incluyen la imagen del plano y tus fotos. Por eso `.gitignore` excluye `privado/` y `proyectos/*.json`: no los subas a un repositorio público, y ten en cuenta que todo lo que publiques con GitHub Pages lo puede ver cualquiera.

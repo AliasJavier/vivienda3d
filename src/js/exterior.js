@@ -3,7 +3,7 @@
    - lado de la urbanización: jardín, piscina, pádel, juegos, bloques alrededor
    - lado de la calle: aceras, carril bici, avenida con mediana, coches, autobús,
      peatones, bloques de enfrente, una obra con grúa (barrio nuevo)
-   Es un decorado genérico de barrio nuevo de Madrid (estilo Los Berrocales),
+   Es un decorado genérico de barrio residencial nuevo,
    no una reproducción de la parcela real.
    Todo se construye en un sistema local: z = hacia fuera de la fachada, x = a lo largo.
    ========================================================================= */
