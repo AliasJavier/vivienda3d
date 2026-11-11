@@ -51,7 +51,7 @@ function edPaint(){
   c.fillStyle='#fff'; c.fillRect(0,0,Ed.src.img.w,Ed.src.img.h);
   if(Ed.img&&Ed.showImg){ c.globalAlpha=Ed.opacity; c.imageSmoothingQuality='high'; c.drawImage(Ed.img,0,0,Ed.src.img.w,Ed.src.img.h); c.globalAlpha=1; }
   c.strokeStyle='rgba(0,0,0,.15)'; c.lineWidth=px; c.strokeRect(0,0,Ed.src.img.w,Ed.src.img.h);
-  const sel=Ed.sel, S=scaleInfo(Ed.src).S;
+  const sel=Ed.sel, SI=scaleInfo(Ed.src), S=SI.S;
   // estancias
   Ed.src.rooms.forEach((r,i)=>{ if(r.poly.length<3) return; const hue=(i*67+190)%360, on=sel&&sel.type==='room'&&sel.id===r.id;
     c.beginPath(); r.poly.forEach((p,j)=>j?c.lineTo(p[0],p[1]):c.moveTo(p[0],p[1])); c.closePath();
@@ -87,7 +87,7 @@ function edPaint(){
   // etiquetas de estancias
   c.textAlign='center'; c.textBaseline='middle';
   Ed.src.rooms.forEach(r=>{ if(r.poly.length<3) return; const [cx,cy]=P2.centroid(r.poly), a=P2.area(r.poly);
-    const meas=S?fmtN(a/(S*S))+' m²':'', wr=r.m2>0?fmtN(r.m2)+' m²':'';
+    const wr=r.m2>0?fmtN(r.m2)+' m²':'', meas=S&&!(SI.fixed&&wr)?fmtN(a/(S*S))+' m²':'';   // con la escala fijada a mano, manda lo que pone el plano
     const l2=wr&&meas?`${wr} · medido ${meas}`:(wr||meas);
     c.font=`600 ${13*px}px Archivo, system-ui, sans-serif`; const w1=c.measureText(r.label).width; c.font=`500 ${11.5*px}px Archivo, system-ui, sans-serif`; const w2=l2?c.measureText(l2).width:0;
     const xs=r.poly.map(q=>q[0]), ys=r.poly.map(q=>q[1]), rw=Math.max(...xs)-Math.min(...xs), rh=Math.max(...ys)-Math.min(...ys);

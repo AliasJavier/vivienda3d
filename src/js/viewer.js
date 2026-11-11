@@ -182,6 +182,8 @@ let state = {v:1, materials:{}, furniture:[], photos:[], collide:true};
    ========================================================================= */
 const host=$('canvasHost');
 const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.xr.enabled=true;      // modo VR (WebXR); sin sesión activa se dibuja como siempre
+const VR={on:false,supported:false,session:null};   // estado del modo VR (ver vr.js)
 renderer.setPixelRatio(Math.min(devicePixelRatio,2));
 renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputEncoding=THREE.sRGBEncoding;
@@ -213,10 +215,12 @@ function updateBounds(){
   ground.position.set(CENTER.x,-.06,CENTER.z);
 }
 
+let extOn=false;     // hay entorno exterior (ver exterior.js)
 function applyTheme(){
   const cs=getComputedStyle(document.documentElement);
   const bg=new THREE.Color(cs.getPropertyValue('--scene').trim()||'#E1E6E3');
-  scene.background=bg; scene.fog=new THREE.Fog(bg,30,70);
+  if(extOn){ const sky=new THREE.Color(0xDDE9F0); scene.background=sky; scene.fog=new THREE.Fog(sky,160,640); }
+  else { scene.background=bg; scene.fog=new THREE.Fog(bg,30,70); }
   const dark=bg.getHSL({}).l<.3; ground.material.color.set(dark?0x2a302d:0xa9b0ab);
 }
 applyTheme();
@@ -265,6 +269,14 @@ function buildFloor(r){
   const l=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0x2F5F8F,depthTest:false,transparent:true}));
   l.renderOrder=5; l.visible=false; world.add(l); outlines[r.id]=l;
 }
+
+/* ---------- techos: solo se ven desde dentro (la cara mira hacia abajo) ---------- */
+const ceilGroup=new THREE.Group(); world.add(ceilGroup);
+const ceilMat=new THREE.MeshBasicMaterial({color:0xf1efe9});
+function buildCeiling(r){ if(r.terrace||r.poly.length<3) return;
+  const sh=new THREE.Shape(); r.poly.forEach(([x,z],i)=>i?sh.lineTo(x,z):sh.moveTo(x,z)); sh.closePath();
+  const g=new THREE.ShapeGeometry(sh); g.rotateX(Math.PI/2);
+  const m=new THREE.Mesh(g,ceilMat); m.position.y=PLAN.H_INT; ceilGroup.add(m); }
 
 /* ---------- muros con puertas y ventanas ---------- */
 const wallGroup=new THREE.Group(); world.add(wallGroup);
@@ -416,12 +428,14 @@ function buildCloset(c){
 function disposeObj(o){ o.traverse(n=>{ if(n.geometry) n.geometry.dispose(); }); }
 /* Construye (o reconstruye) suelos, muros y armarios a partir de una planta en metros */
 function loadPlan(plan){
-  PLAN=plan; ROOM=Object.fromEntries(PLAN.rooms.map(r=>[r.id,r]));
+  PLAN=plan; ROOM=Object.fromEntries(PLAN.rooms.map(r=>[r.id,r])); planRev++;
   [...wallGroup.children].forEach(c=>{ wallGroup.remove(c); disposeObj(c); });
+  [...ceilGroup.children].forEach(c=>{ ceilGroup.remove(c); c.geometry.dispose(); });
   floorMeshes.forEach(m=>{ world.remove(m); m.geometry.dispose(); }); floorMeshes.length=0;
   Object.keys(outlines).forEach(k=>{ world.remove(outlines[k]); outlines[k].geometry.dispose(); outlines[k].material.dispose(); delete outlines[k]; });
   obstacles.length=0; pickables.length=0;
   PLAN.rooms.forEach(buildFloor);
+  PLAN.rooms.forEach(buildCeiling);
   PLAN.walls.forEach(buildWall);
   PLAN.closets.forEach(buildCloset);
   pickables.push(...floorMeshes);
@@ -673,6 +687,7 @@ addEventListener('keydown',e=>{
   if(k==='escape'){ if(tool==='measure') setTool(null); else selectFurn(null); }
   if(selFurn && (k==='delete'||k==='backspace')){ e.preventDefault(); delFurn(selFurn); }
   if(selFurn && k==='r'){ rotFurn(e.shiftKey?-90:90); }
+  if(selFurn && k==='d' && (e.ctrlKey||e.metaKey)){ e.preventDefault(); dupFurn(selFurn); }
 });
 addEventListener('keyup',e=>{ const map={w:'f',arrowup:'f',s:'b',arrowdown:'b',a:'sl',d:'sr',arrowleft:'l',arrowright:'r'}; const m=map[e.key.toLowerCase()]; if(m) walkKeys[m]=0; });
 document.querySelectorAll('#walkpad button').forEach(b=>{
@@ -695,7 +710,12 @@ $('vOrbit').onclick=()=>setMode('orbit'); $('vPlan').onclick=()=>setMode('plan')
 $('tReset').onclick=viewAll;
 function setTool(t){ tool=t; $('tMeasure').setAttribute('aria-pressed',t==='measure'); if(t!=='measure') clearMeasure(); updateHint(); }
 $('tMeasure').onclick=()=>setTool(tool==='measure'?null:'measure');
-let low=false; $('tLow').onclick=()=>{ low=!low; $('tLow').setAttribute('aria-pressed',low); wallGroup.scale.y=low?.42:1; };
+let low=false;
+function setLow(v){ low=v; $('tLow').setAttribute('aria-pressed',low); wallGroup.scale.y=low?.42:1; ceilGroup.visible=!low; }
+$('tLow').onclick=()=>setLow(!low);
+/* captura de la vista actual en PNG */
+$('tShot').onclick=()=>{ if(VR.on) return; applyCam(); renderer.render(scene,camera);
+  renderer.domElement.toBlob(b=>{ if(b) download(b,`${slug($('projName').textContent)}-vista-${today()}.png`); },'image/png'); };
 const goSel=$('goRoom');
 goSel.onchange=()=>{ if(goSel.value) goRoom(goSel.value); goSel.value=''; };
 function updateHint(){
@@ -727,10 +747,12 @@ function updateLabels(){
 }
 
 /* ---------- bucle ---------- */
-function resize(){ const w=host.clientWidth, h=host.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
+function resize(){ if(VR.on) return; const w=host.clientWidth, h=host.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
 new ResizeObserver(resize).observe(host); resize();
 let lastT=performance.now();
-function loop(now){ requestAnimationFrame(loop); const dt=Math.min(.05,(now-lastT)/1000); lastT=now;
+function loop(now,frame){ now=now||performance.now(); const dt=Math.min(.05,Math.max(0,(now-lastT)/1000)); lastT=now;
+  extUpdate(dt);
+  if(VR.on){ vrUpdate(dt,frame); renderer.render(scene,camera); return; }
   stepTween(now);
   if(cam.mode==='walk'){ const w=cam.walk, sp=1.7*dt, fx=-Math.sin(w.yaw), fz=-Math.cos(w.yaw);
     w.yaw+=(walkKeys.l-walkKeys.r)*1.8*dt;
@@ -878,6 +900,10 @@ $('rotL').onclick=()=>rotFurn(90); $('rotR').onclick=()=>rotFurn(-90); $('rotL15
 $('fDup').onclick=()=>{ const f=state.furniture.find(x=>x.id===selFurn); if(!f) return; const n={...f,id:newId(),x:+(f.x+.3).toFixed(2),z:+(f.z+.3).toFixed(2)}; fitFurn(n,3);
   state.furniture.push(n); fRender(n); selectFurn(n.id); saveSoon(); };
 $('fDel').onclick=()=>selFurn&&delFurn(selFurn);
+function dupFurn(id){ const f=state.furniture.find(x=>x.id===id); if(!f) return; const g={...f,id:newId(),x:f.x+.3,z:f.z+.3};
+  if(!fitFurn(g,2.5)){ note('No hay sitio libre cerca para la copia.'); return; }
+  state.furniture.push(g); fRender(g); selectFurn(g.id); saveSoon(); }
+$('fDup').onclick=()=>selFurn&&dupFurn(selFurn);
 $('fUp').onclick=async()=>{ const f=state.furniture.find(x=>x.id===selFurn); if(!f||f.type!=='model') return;
   try{ const p=await parseModel(f.model); const old=modelTemplate(f.model,f.upq,p); f.upq=((f.upq||0)+1)%4; const t=modelTemplate(f.model,f.upq,p);
     const k=f.w/(old.size.x*100); f.w=clamp(Math.round(t.size.x*100*k),1,600); f.d=clamp(Math.round(t.size.z*100*k),1,600); f.h=clamp(Math.round(t.size.y*100*k),1,300);

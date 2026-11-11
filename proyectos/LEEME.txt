@@ -1,0 +1,2 @@
+Deja aquí los proyectos exportados (.json) que quieras abrir por dirección, por ejemplo en las gafas:
+  http://localhost:8000/?p=proyectos/mi-casa.json

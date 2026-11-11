@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / 'src'
-JS_ORDER = ['core.js', 'viewer.js', 'detect.js', 'plan.js', 'editor.js', 'app.js']
+JS_ORDER = ['core.js', 'viewer.js', 'exterior.js', 'vr.js', 'detect.js', 'plan.js', 'editor.js', 'app.js']
 
 sys.path.insert(0, str(SRC))
 import plan_data as P  # noqa: E402

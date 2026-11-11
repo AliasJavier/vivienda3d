@@ -8,17 +8,17 @@ let view='3d';
 let designLoaded=false;  // el estado del 3D corresponde al proyecto abierto
 
 /* ---------- estado del diseño 3D (materiales, muebles, fotos) ---------- */
-function serialize(){ return {v:1, materials:state.materials, furniture:state.furniture, photos:state.photos, collide:state.collide}; }
+function serialize(){ return {v:1, materials:state.materials, furniture:state.furniture, photos:state.photos, collide:state.collide, exterior:state.exterior||{}}; }
 function applyState(data){
   data=data||{};
   const mats={...defaultMaterials(),...(data.materials||{})};
-  state={v:1,materials:mats,furniture:Array.isArray(data.furniture)?data.furniture.map(f=>({...f})):[],photos:Array.isArray(data.photos)?data.photos.map(p=>({...p})):[], collide:data.collide!==false};
+  state={v:1,materials:mats,furniture:Array.isArray(data.furniture)?data.furniture.map(f=>({...f})):[],photos:Array.isArray(data.photos)?data.photos.map(p=>({...p})):[], collide:data.collide!==false, exterior:{...(data.exterior||{})}};
   state.photos=state.photos.filter(p=>localPhotos[p.ref]);
   state.furniture=state.furniture.filter(f=>f.type!=='model'||modelBufs[f.model]);
   Object.keys(state.materials).forEach(k=>{ const m=state.materials[k]; if(m.kind==='photo'&&!localPhotos[m.ref]){ const d=defaultMaterials()[k]; if(d) state.materials[k]=d; else delete state.materials[k]; } });
   $('collideIn').checked=state.collide;
   if(!state.materials[selSurf]) selSurf=PLAN.rooms[0]?'floor:'+PLAN.rooms[0].id:'walls:exterior';
-  applyAllSurfaces(); renderAllFurniture();
+  applyAllSurfaces(); renderAllFurniture(); buildExterior();
   if(selFurn && !state.furniture.some(f=>f.id===selFurn)) selFurn=null; updateSelBox();
   selectSurface(selSurf); renderFurnPanel();
 }
@@ -31,7 +31,18 @@ async function loadAssets(design){
 /* ---------- guardado ---------- */
 let saveTimer=null, storageOk=true;
 function setStatus(s,txt){ const e=$('status'); e.dataset.s=s; e.querySelector('span').textContent=txt||{saved:'Guardado en este navegador',saving:'Guardando…',error:'No se pudo guardar',local:'Sin guardado: exporta el proyecto'}[s]; }
-function saveSoon(){ if(!cur) return; if(!storageOk){ setStatus('error','No se puede guardar aquí: usa Exportar'); return; } setStatus('saving'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,600); }
+/* deshacer / rehacer en el 3D (muebles y materiales) */
+const hist3={stack:[],redo:[],last:null,lock:false};
+function hist3Reset(){ hist3.stack=[]; hist3.redo=[]; hist3.last=JSON.stringify(serialize()); }
+function hist3Track(){ if(hist3.lock||view!=='3d'||!designLoaded) return; const snap=JSON.stringify(serialize()); if(snap===hist3.last) return;
+  if(hist3.last){ hist3.stack.push(hist3.last); if(hist3.stack.length>60) hist3.stack.shift(); } hist3.redo=[]; hist3.last=snap; }
+function hist3Go(back){ const from=back?hist3.stack:hist3.redo, to=back?hist3.redo:hist3.stack; if(!from.length||view!=='3d'||!designLoaded) return;
+  to.push(hist3.last); hist3.last=from.pop(); hist3.lock=true;
+  try{ applyState(JSON.parse(hist3.last)); } finally { hist3.lock=false; }
+  saveSoon(); note(back?'Deshecho.':'Rehecho.'); }
+addEventListener('keydown',e=>{ if(view!=='3d'||!(e.ctrlKey||e.metaKey)) return; if(/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName||'')) return;
+  const k=e.key.toLowerCase(); if(k==='z'){ e.preventDefault(); hist3Go(!e.shiftKey); } else if(k==='y'){ e.preventDefault(); hist3Go(false); } });
+function saveSoon(){ if(!cur) return; hist3Track(); if(!storageOk){ setStatus('error','No se puede guardar aquí: usa Exportar'); return; } setStatus('saving'); clearTimeout(saveTimer); saveTimer=setTimeout(flush,600); }
 function projectChanged(){ if(cur){ cur.dirtyPlan=true; saveSoon(); } }
 async function flush(){
   if(!cur) return;
@@ -65,7 +76,7 @@ function setView(v,opts={}){
     if(!plan||!plan.walls.length){ v='edit'; if(opts.explain!==false) edMsg('Para ver el 3D hace falta al menos un muro y la escala.'); }
     else {
       if(view==='3d'&&designLoaded) cur.design=JSON.parse(JSON.stringify(serialize()));
-      loadPlan(plan); applyState(cur.design); designLoaded=true; cur.dirtyPlan=false;
+      hist3.lock=true; loadPlan(plan); applyState(cur.design); hist3.lock=false; designLoaded=true; hist3Reset(); cur.dirtyPlan=false;
       if(!plan.rooms.length) note('No hay estancias: sin ellas no hay suelos. Créalas en Plano › Estancia.');
     } }
   if(v==='edit'&&view==='3d'&&designLoaded) cur.design=JSON.parse(JSON.stringify(serialize()));
@@ -99,11 +110,11 @@ async function openProject(id){
   const want=rec.view||'3d';
   setView(planFromSrc(cur.src)&&cur.src.walls.length?want:'edit',{explain:false,fit:true,fitEd:true});
 }
-async function createProject({name,src,design,imgBlob}){
+async function createProject({name,src,design,imgBlob,view='edit'}){
   const id=uid('p');
   const p={id,name:name||'Nuevo plano',src:normalizeSrc(src),design:design||{}};
   if(imgBlob) await idbPut('img:'+id,imgBlob);
-  await idbPut('proj:'+id,{...p,view:'edit'});
+  await idbPut('proj:'+id,{...p,view});
   projList.unshift(metaOf(p)); await idbPut('projects',projList);
   return id;
 }
@@ -209,21 +220,34 @@ async function importAssets(doc){
     const buf=await (await dataURLToBlob(m.data)).arrayBuffer(); modelBufs[ref]={buf,ext:m.ext,name:m.name||'Modelo'}; delete modelParsed[ref];
     Object.keys(modelTpl).forEach(k=>k.startsWith(ref+'|')&&delete modelTpl[k]); try{ await idbPut('model:'+ref,modelBufs[ref]); }catch(_){} }
 }
+async function importProjectDoc(doc){
+  await importAssets(doc);
+  const img=doc.image?await dataURLToBlob(doc.image):null;
+  return createProject({name:doc.name||'Proyecto importado',src:doc.src,design:doc.design,imgBlob:img,view:'3d'});
+}
 async function importFile(f,fromHome){
   const msg=fromHome?(t,ok)=>{ const m=$('homeMsg'); m.textContent=t; m.classList.toggle('ok',!!ok); }:fileMsg;
   try{
     const doc=JSON.parse(await f.text());
-    if(doc&&doc.kind==='project'&&doc.src){
-      await importAssets(doc);
-      const img=doc.image?await dataURLToBlob(doc.image):null;
-      const id=await createProject({name:doc.name||'Proyecto importado',src:doc.src,design:doc.design,imgBlob:img});
-      msg(`Importado "${doc.name}".`,true); await openProject(id); return; }
+    if(doc&&doc.kind==='project'&&doc.src){ const id=await importProjectDoc(doc); msg(`Importado "${doc.name}".`,true); await openProject(id); return; }
     if(doc&&doc.app===APP_ID&&doc.design){   // diseño de la versión anterior: se aplica al proyecto abierto
       if(!cur){ msg('Abre primero el proyecto al que pertenece ese diseño.'); return; }
       await importAssets(doc); cur.design=doc.design; if(view==='3d'&&designLoaded){ applyState(doc.design); } saveSoon();
       msg(`Diseño importado en "${cur.name}": ${(doc.design.furniture||[]).length} muebles.`,true); return; }
     msg('Ese archivo no es un proyecto exportado desde aquí.');
   }catch(err){ console.error(err); msg('No se pudo leer el archivo. ¿Es un .json exportado desde aquí?'); }
+}
+/* abre un proyecto exportado que esté servido junto a la app: index.html?p=proyectos/mi-casa.json
+   (así se lleva un proyecto a las gafas sin tener que subir el archivo desde ellas) */
+async function openFromURL(){
+  const p=new URLSearchParams(location.search).get('p'); if(!p) return false;
+  try{
+    const r=await fetch(p,{cache:'no-store'}); if(!r.ok) throw new Error('HTTP '+r.status);
+    const doc=await r.json(); if(!(doc&&doc.kind==='project'&&doc.src)) throw new Error('formato');
+    const key='url:'+p+'|'+(doc.exportedAt||''), known=await idbGet(key);
+    if(known&&projList.some(x=>x.id===known)){ await openProject(known); return true; }
+    const id=await importProjectDoc(doc); await idbPut(key,id); await openProject(id); return true;
+  }catch(e){ console.error(e); showHome(); const m=$('homeMsg'); m.classList.remove('ok'); m.textContent=`No se pudo abrir el proyecto "${p}". Comprueba que el archivo está en esa ruta.`; return true; }
 }
 function fileMsg(t,ok){ const m=$('fileMsg'); m.textContent=t; m.classList.toggle('ok',!!ok); clearTimeout(fileMsg.t); fileMsg.t=setTimeout(()=>m.textContent='',5000); }
 $('expBtn').onclick=()=>cur&&exportProject(cur.id);
@@ -234,7 +258,7 @@ $('dxfBtn').onclick=()=>{ if(!cur) return; const plan=planFromSrc(cur.src); if(!
 /* ---------- arranque ---------- */
 async function boot(){
   updateHint();
-  applyCam(); requestAnimationFrame(loop);
+  applyCam(); renderer.setAnimationLoop(loop);
   try{
     projList=(await idbGet('projects'))||null;
     if(!projList){   // primera vez: crea el proyecto de ejemplo y recupera lo guardado por la versión anterior
@@ -246,7 +270,8 @@ async function boot(){
       const rec=await idbGet('proj:'+id); rec.view='3d'; await idbPut('proj:'+id,rec);
     }
     const last=await idbGet('last');
-    if(last&&projList.some(p=>p.id===last)) await openProject(last);
+    if(await openFromURL()){ /* proyecto indicado en la dirección */ }
+    else if(last&&projList.some(p=>p.id===last)) await openProject(last);
     else if(projList.length) await openProject(projList[0].id);
     else showHome();
   }catch(e){ console.error(e); storageOk=false; setStatus('local');
@@ -257,3 +282,5 @@ async function boot(){
 boot();
 // acceso para depurar desde la consola del navegador
 window.__vivienda={Ed,get project(){return cur;},planFromSrc,scaleInfo,floorMeshes,get plan(){return PLAN;},get state(){return state;}};
+Object.assign(window.__vivienda,{VR,vr:{head:()=>vrHead(),yaw:()=>rig.rotation.y,room:()=>{ const h=vrHead(); return roomAt(h.x,h.z); },blocked:()=>{ const h=vrHead(); return walkBlocked(h.x,h.z); },marker:()=>vrMarker.visible,camFree:()=>camera.parent===null}});
+Object.assign(window.__vivienda,{cam,applyCam,setMode,EXT,renderer});
