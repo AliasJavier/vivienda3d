@@ -1,0 +1,39 @@
+# Dependencies
+vendor/
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Generated files
+index.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local development
+*.log
+.env
+.env.local
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Planta en metros que genera src/plan_data.py (la app ya no la usa)
+src/plan.json
+
+# Metadatos que Windows añade al copiar archivos
+*Zone.Identifier
+*.gz

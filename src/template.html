@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Vivienda 3D</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Archivo+Narrow:wght@500;600&display=swap">
+<style>
+[hidden]{display:none!important}
+html{color-scheme:light}
+:root{
+  --scene:#E1E6E3; --panel:#F8F9F7; --panel-2:#EEF1EE; --ink:#1B2220; --muted:#5B6661; --line:#D3D9D5;
+  --accent:#2F5F8F; --accent-soft:rgba(47,95,143,.12); --accent-ink:#FFFFFF; --warn:#A8492A; --ok:#2F7A55;
+  --chip:#FFFFFF; --shadow:0 1px 2px rgba(20,30,25,.08),0 6px 18px rgba(20,30,25,.10);
+  --ui:"Archivo",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --num:"Archivo Narrow","Archivo",ui-sans-serif,system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --scene:#101412; --panel:#171C1A; --panel-2:#1E2421; --ink:#E3E8E5; --muted:#97A29C; --line:#2A322E;
+    --accent:#8DB3DB; --accent-soft:rgba(141,179,219,.14); --accent-ink:#0F1A24; --warn:#E08A63; --ok:#7CC6A0;
+    --chip:#222A27; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --scene:#101412; --panel:#171C1A; --panel-2:#1E2421; --ink:#E3E8E5; --muted:#97A29C; --line:#2A322E;
+  --accent:#8DB3DB; --accent-soft:rgba(141,179,219,.14); --accent-ink:#0F1A24; --warn:#E08A63; --ok:#7CC6A0;
+  --chip:#222A27; --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--panel);color:var(--ink);font-family:var(--ui);font-size:14px;line-height:1.4;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 360px}
+.stage{position:relative;min-height:0;min-width:0;background:var(--scene);overflow:hidden}
+#canvasHost{position:absolute;inset:0}
+#canvasHost canvas{display:block;width:100%;height:100%;touch-action:none;outline:none}
+.drop-on #canvasHost::after{content:"Suelta la foto para aplicarla";position:absolute;inset:12px;border:2px dashed var(--accent);
+  border-radius:12px;display:grid;place-items:center;background:var(--accent-soft);color:var(--ink);font-weight:600}
+
+/* barra de herramientas */
+.toolbar{position:absolute;top:12px;left:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;pointer-events:none}
+.toolbar > *{pointer-events:auto}
+.seg{display:inline-flex;background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:3px;box-shadow:var(--shadow)}
+.seg button{border:0;background:transparent;padding:7px 11px;border-radius:7px;font-weight:500;font-size:13px;color:var(--muted);white-space:nowrap}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.tool{border:1px solid var(--line);background:var(--chip);border-radius:10px;padding:8px 11px;font-size:13px;font-weight:500;box-shadow:var(--shadow);white-space:nowrap}
+.tool[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.tool select{border:0;background:transparent;padding:0;font-weight:500}
+.go{display:inline-flex;align-items:center;gap:6px}
+.go label{color:var(--muted);font-size:12px}
+.status{position:absolute;right:12px;bottom:12px;font-size:12px;color:var(--muted);background:var(--chip);border:1px solid var(--line);
+  border-radius:999px;padding:5px 10px 5px 8px;display:flex;align-items:center;gap:6px;box-shadow:var(--shadow);max-width:calc(100% - 24px)}
+.status i{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.status[data-s="saved"] i{background:var(--ok)} .status[data-s="saving"] i{background:var(--accent)} .status[data-s="error"] i,.status[data-s="local"] i{background:var(--warn)}
+.hint{position:absolute;left:12px;bottom:12px;font-size:12px;color:var(--muted);background:var(--chip);border:1px solid var(--line);
+  border-radius:10px;padding:6px 10px;max-width:min(520px,calc(100% - 200px));box-shadow:var(--shadow)}
+.walkpad{position:absolute;right:16px;bottom:56px;display:grid;grid-template-columns:repeat(3,48px);grid-template-rows:repeat(2,48px);gap:6px}
+.walkpad button{border:1px solid var(--line);background:var(--chip);border-radius:12px;font-size:18px;box-shadow:var(--shadow);touch-action:none;user-select:none}
+.walkpad .up{grid-column:2;grid-row:1}.walkpad .lt{grid-column:1;grid-row:2}.walkpad .dn{grid-column:2;grid-row:2}.walkpad .rt{grid-column:3;grid-row:2}
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.lbl{position:absolute;transform:translate(-50%,-100%);background:var(--ink);color:var(--panel);font-family:var(--num);font-weight:600;
+  font-size:13px;padding:3px 8px;border-radius:6px;white-space:nowrap;font-variant-numeric:tabular-nums;box-shadow:var(--shadow)}
+.lbl small{font-weight:500;opacity:.75;margin-left:4px}
+.lbl.measure{background:var(--accent);color:var(--accent-ink)}
+
+/* panel */
+.panel{min-height:0;display:flex;flex-direction:column;border-left:1px solid var(--line);background:var(--panel)}
+.panel header{padding:16px 16px 0;display:flex;flex-direction:column;gap:12px;border-bottom:1px solid var(--line)}
+.brand{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.brand h1{font-size:17px;margin:0;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.brand span{font-family:var(--num);color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:4px}
+.tabs button{flex:1;border:0;background:transparent;padding:10px 4px 11px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.scroll{overflow-y:auto;min-height:0;flex:1;padding:16px;display:flex;flex-direction:column;gap:20px}
+.block{display:flex;flex-direction:column;gap:10px}
+.block h2{font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.sel-card{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.sel-card .title{font-weight:600;font-size:15px}
+.sel-card .sub{color:var(--muted);font-size:12.5px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field label{font-size:12px;color:var(--muted)}
+.field input,.field select{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:8px;background:var(--chip)}
+.num input{font-family:var(--num);font-variant-numeric:tabular-nums;font-size:15px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.btn{border:1px solid var(--line);background:var(--chip);border-radius:8px;padding:8px 11px;font-weight:500;font-size:13px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.danger{color:var(--warn)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.swatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(70px,1fr));gap:8px}
+.sw{border:1px solid var(--line);background:var(--chip);border-radius:10px;padding:4px;display:flex;flex-direction:column;gap:4px;text-align:left}
+.sw span.img{display:block;aspect-ratio:1/1;border-radius:7px;background-size:cover;background-position:center;background-color:var(--panel-2)}
+.sw span.name{font-size:11.5px;line-height:1.2;padding:0 2px 2px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sw[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.sw[aria-pressed="true"] span.name{color:var(--ink)}
+.upload{display:flex;gap:10px;align-items:center;border:1px dashed var(--line);border-radius:12px;padding:12px;background:var(--panel-2)}
+.upload p{margin:0;font-size:12.5px;color:var(--muted);flex:1}
+.range{display:flex;flex-direction:column;gap:6px}
+.range .top{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
+.range .top b{font-family:var(--num);color:var(--ink);font-weight:600;font-variant-numeric:tabular-nums}
+.range input{width:100%;accent-color:var(--accent)}
+.msg{font-size:12.5px;color:var(--warn)}
+.msg:empty{display:none}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.catalog{display:flex;flex-direction:column;gap:14px}
+.cat h3{margin:0 0 6px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.items{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.item{border:1px solid var(--line);background:var(--chip);border-radius:9px;padding:8px 10px;text-align:left;display:flex;flex-direction:column;gap:1px}
+.item b{font-weight:500;font-size:13px}
+.item small{font-family:var(--num);color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.item:hover{border-color:var(--accent)}
+.placed{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.placed button{border:0;border-bottom:1px solid var(--line);background:var(--chip);padding:8px 10px;display:flex;justify-content:space-between;gap:8px;text-align:left}
+.placed button:last-child{border-bottom:0}
+.placed button small{font-family:var(--num);color:var(--muted);font-variant-numeric:tabular-nums}
+.placed button[aria-current="true"]{background:var(--accent-soft)}
+.colors{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.colors button{width:26px;height:26px;border-radius:50%;border:2px solid var(--panel);box-shadow:0 0 0 1px var(--line)}
+.colors button[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent)}
+.colors input[type=color]{width:30px;height:28px;border:1px solid var(--line);border-radius:8px;padding:2px;background:var(--chip)}
+details.custom{border:1px solid var(--line);border-radius:12px;background:var(--panel-2)}
+details.custom summary{padding:10px 12px;font-weight:600;cursor:pointer}
+details.custom .inner{padding:0 12px 12px;display:flex;flex-direction:column;gap:10px}
+.empty{color:var(--muted);font-size:12.5px;margin:0}
+.cat .src{font-size:11.5px;color:var(--muted);margin:-2px 0 6px}
+.cat .src a{color:var(--accent)}
+.item .brand-tag{font-size:10.5px;letter-spacing:.06em;color:var(--accent);font-weight:600}
+.filebar{gap:6px}
+.filebar .btn{padding:6px 10px;font-size:12.5px}
+.filebar .msg{flex-basis:100%}
+.filebar .msg.ok{color:var(--ok)}
+.toggle{display:flex;gap:8px;align-items:flex-start;font-weight:500}
+.toggle input{margin-top:3px;accent-color:var(--accent);width:16px;height:16px;flex:none}
+.kbd{font-family:var(--num);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:11.5px}
+
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(0,46%)}
+  .panel{border-left:0;border-top:1px solid var(--line)}
+  .panel header{padding-top:10px;gap:6px}
+  .brand h1{font-size:15px}
+  .hint{display:none}
+  .toolbar{top:8px;left:8px;right:8px;gap:6px}
+  .seg button{padding:6px 9px}
+  .tool{padding:7px 9px}
+  .walkpad{bottom:48px}
+}
+@media (prefers-reduced-motion: reduce){ *{scroll-behavior:auto} }
+
+/* ---------- cabecera de proyecto y vistas ---------- */
+.brand{align-items:center}
+.brand .proj{display:flex;align-items:center;gap:8px;min-width:0}
+.brand h1{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.back{border:1px solid var(--line);background:var(--chip);border-radius:8px;padding:5px 9px;font-size:12.5px;font-weight:500;white-space:nowrap}
+.viewseg{display:flex}
+.viewseg .seg{box-shadow:none;width:100%}
+.viewseg .seg button{flex:1;font-size:13.5px;padding:8px 10px}
+/* ---------- editor 2D ---------- */
+#ed{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;outline:none}
+#tbEd .seg{max-width:100%;overflow-x:auto;scrollbar-width:thin}
+#tbEd .seg button{padding:7px 9px;flex:none}
+#tbEd .tool:disabled{opacity:.45;cursor:not-allowed}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.steps li{display:flex;gap:8px;align-items:center;color:var(--muted);font-size:13px}
+.steps li i{width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-style:normal;font-size:11px;flex:none}
+.steps li.ok{color:var(--ink)} .steps li.ok i{background:var(--ok);border-color:var(--ok);color:#fff}
+.refs{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.refs li{display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:7px 10px;border-bottom:1px solid var(--line);font-size:12.5px;align-items:baseline;background:var(--chip)}
+.refs li:last-child{border-bottom:0}
+.refs b{font-family:var(--num);font-weight:600;font-variant-numeric:tabular-nums}
+.refs small{font-family:var(--num);color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+.refs small.bad{color:var(--warn);font-weight:600}
+.note.warn{color:var(--warn)}
+.measured{display:block;padding:8px 9px;border:1px dashed var(--line);border-radius:8px;font-family:var(--num);font-size:15px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.msg.ok{color:var(--ok)}
+.inline{display:flex;gap:8px;align-items:center}
+.inline input[type=number]{width:96px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--chip);font-family:var(--num)}
+.cta{position:sticky;bottom:-16px;margin:0 -16px -16px;background:var(--panel);padding:12px 16px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;z-index:2}
+.cta .btn{width:100%;padding:11px;font-size:14px}
+/* ---------- pantalla de proyectos ---------- */
+.home{position:fixed;inset:0;z-index:50;background:var(--panel);overflow-y:auto}
+.home .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 48px;display:flex;flex-direction:column;gap:20px}
+.home .top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
+.home h1{margin:0;font-size:26px;letter-spacing:-.02em;font-weight:700}
+.home .lead{margin:4px 0 0;color:var(--muted);max-width:60ch;text-wrap:pretty}
+.home .acts{display:flex;gap:8px;flex-wrap:wrap}
+.home .acts .btn{padding:10px 14px;font-size:14px}
+.how{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0;padding:0;list-style:none;counter-reset:s}
+.how li{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:12px 12px 12px 40px;position:relative;font-size:13px;color:var(--muted)}
+.how li b{display:block;color:var(--ink);font-weight:600;margin-bottom:2px}
+.how li::before{counter-increment:s;content:counter(s);position:absolute;left:12px;top:12px;width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-size:12px;font-weight:700;font-family:var(--num)}
+.plist{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.pcard{border:1px solid var(--line);border-radius:14px;background:var(--chip);overflow:hidden;display:flex;flex-direction:column;box-shadow:var(--shadow)}
+.pcard.current{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent),var(--shadow)}
+.pthumb{border:0;padding:0;background:#F4F5F2;aspect-ratio:16/10;display:grid;place-items:center;color:#8a948f;font-size:12.5px}
+.pthumb img{width:100%;height:100%;object-fit:contain;display:block}
+.pinfo{padding:10px 12px 4px;display:flex;flex-direction:column;gap:2px}
+.pname{border:1px solid transparent;background:transparent;font-weight:600;font-size:15px;padding:3px 4px;margin-left:-5px;border-radius:6px;width:100%}
+.pname:hover,.pname:focus{border-color:var(--line);background:var(--panel)}
+.pinfo small{color:var(--muted);font-size:12px;font-family:var(--num);font-variant-numeric:tabular-nums}
+.pact{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 12px}
+.pact .btn{padding:6px 9px;font-size:12.5px}
+@media (max-width:760px){ .how{grid-template-columns:1fr 1fr} .home h1{font-size:22px} }
+</style>
+</head>
+<body>
+<div class="app" id="app" data-view="3d">
+  <main class="stage" id="stage">
+    <div id="canvasHost"></div>
+    <div id="labels"></div>
+    <div class="toolbar" id="tb3d">
+      <div class="seg" role="group" aria-label="Modo de vista">
+        <button id="vOrbit" aria-pressed="true">3D</button>
+        <button id="vPlan" aria-pressed="false">Planta</button>
+        <button id="vWalk" aria-pressed="false">Paseo</button>
+      </div>
+      <label class="tool go"><span class="sr" hidden>Ir a</span>
+        <select id="goRoom" aria-label="Ir a una estancia"><option value="">Ir a…</option></select>
+      </label>
+      <button class="tool" id="tMeasure" aria-pressed="false">Medir</button>
+      <button class="tool" id="tLow" aria-pressed="false">Muros bajos</button>
+      <button class="tool" id="tReset">Ver todo</button>
+    </div>
+    <canvas id="ed" hidden tabindex="0" aria-label="Editor del plano"></canvas>
+    <div class="toolbar" id="tbEd" hidden>
+      <div class="seg" role="group" aria-label="Herramienta">
+        <button data-tool="select" aria-pressed="true" title="Seleccionar (V)">Seleccionar</button>
+        <button data-tool="wall" aria-pressed="false" title="Dibujar muro (M)">Muro</button>
+        <button data-tool="door" aria-pressed="false" title="Puerta (P)">Puerta</button>
+        <button data-tool="window" aria-pressed="false">Ventana</button>
+        <button data-tool="glass" aria-pressed="false">Ventanal</button>
+        <button data-tool="glassdoor" aria-pressed="false">Pta. cristal</button>
+        <button data-tool="room" aria-pressed="false" title="Estancia (E)">Estancia</button>
+        <button data-tool="roomdraw" aria-pressed="false">Estancia a mano</button>
+        <button data-tool="closet" aria-pressed="false">Armario</button>
+        <button data-tool="pillar" aria-pressed="false">Pilar</button>
+      </div>
+      <button class="tool" id="edUndo" title="Deshacer (Ctrl+Z)" aria-label="Deshacer">↶</button>
+      <button class="tool" id="edRedo" title="Rehacer (Ctrl+Y)" aria-label="Rehacer">↷</button>
+      <button class="tool" id="edFit">Ver todo</button>
+    </div>
+    <div class="walkpad" id="walkpad" hidden>
+      <button class="up" data-k="f" aria-label="Avanzar">▲</button>
+      <button class="lt" data-k="l" aria-label="Girar a la izquierda">◀</button>
+      <button class="dn" data-k="b" aria-label="Retroceder">▼</button>
+      <button class="rt" data-k="r" aria-label="Girar a la derecha">▶</button>
+    </div>
+    <div class="hint" id="hint"></div>
+    <div class="status" id="status" data-s="local"><i></i><span>Preparando…</span></div>
+  </main>
+
+  <aside class="panel" id="panel">
+    <header>
+      <div class="brand"><div class="proj"><button class="back" id="homeBtn" aria-label="Volver a mis proyectos">‹ Proyectos</button><h1 id="projName"></h1></div><span id="totalM2"></span></div>
+      <div class="viewseg"><div class="seg" role="group" aria-label="Vista">
+        <button id="vEdit" aria-pressed="false">Plano</button><button id="v3d" aria-pressed="true">3D</button></div></div>
+      <div class="row filebar" id="filebar">
+        <button class="btn" id="expBtn">Exportar proyecto</button>
+        <label class="btn" for="impIn">Importar</label>
+        <input type="file" id="impIn" accept=".json,application/json" hidden>
+        <button class="btn" id="dxfBtn">Plano DXF</button>
+        <span class="msg" id="fileMsg" aria-live="polite"></span>
+      </div>
+      <div class="tabs" role="tablist" id="tabs3d">
+        <button role="tab" id="tabSurf" aria-selected="true" aria-controls="paneSurf">Suelos y paredes</button>
+        <button role="tab" id="tabFurn" aria-selected="false" aria-controls="paneFurn">Muebles</button>
+      </div>
+    </header>
+
+    <div class="scroll" id="paneSurf" role="tabpanel" aria-labelledby="tabSurf">
+      <section class="block">
+        <div class="sel-card">
+          <div class="title" id="surfTitle">Suelo · Salón-Comedor</div>
+          <div class="sub">Toca un suelo o una pared en el modelo para elegirlo, o búscalo aquí.</div>
+          <div class="field"><label for="surfSel">Superficie</label><select id="surfSel"></select></div>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2>Tu foto</h2>
+        <div class="upload">
+          <p>Haz una foto de frente al suelo, azulejo o pared que te guste. También puedes arrastrarla sobre el modelo.</p>
+          <label class="btn primary" for="photoIn">Subir foto</label>
+          <input type="file" id="photoIn" accept="image/*" hidden>
+        </div>
+        <div class="msg" id="photoMsg"></div>
+        <div class="swatches" id="photoLib"></div>
+        <p class="empty" id="photoEmpty">Las fotos que subas aparecerán aquí para reutilizarlas en otras estancias.</p>
+      </section>
+
+      <section class="block">
+        <div class="range">
+          <div class="top"><label for="sizeIn">Cada repetición de la textura mide</label><b id="sizeOut">1,00 m</b></div>
+          <input type="range" id="sizeIn" min="0.1" max="4" step="0.05" value="1">
+          <p class="note">Si la foto muestra, por ejemplo, 4 baldosas de 60 cm, pon 1,20 m.</p>
+        </div>
+      </section>
+
+      <section class="block">
+        <h2 id="presetTitle">Materiales</h2>
+        <div class="swatches" id="presets"></div>
+      </section>
+
+      <section class="block">
+        <div class="row">
+          <button class="btn" id="copyAll">Usar en todas las estancias</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="scroll" id="paneFurn" role="tabpanel" aria-labelledby="tabFurn" hidden>
+      <section class="block" id="editBlock" hidden>
+        <div class="sel-card">
+          <div class="field"><label for="fName">Mueble seleccionado</label><input id="fName" type="text" maxlength="40"></div>
+          <div class="grid3 num">
+            <div class="field"><label for="fW">Ancho (cm)</label><input id="fW" type="number" min="5" max="600" step="1" inputmode="numeric"></div>
+            <div class="field"><label for="fD">Fondo (cm)</label><input id="fD" type="number" min="5" max="600" step="1" inputmode="numeric"></div>
+            <div class="field"><label for="fH">Alto (cm)</label><input id="fH" type="number" min="1" max="300" step="1" inputmode="numeric"></div>
+          </div>
+          <div class="row">
+            <button class="btn" id="rotL" aria-label="Girar 90 grados a la izquierda">↺ 90°</button>
+            <button class="btn" id="rotL15" aria-label="Girar 15 grados a la izquierda">↺ 15°</button>
+            <button class="btn" id="rotR15" aria-label="Girar 15 grados a la derecha">↻ 15°</button>
+            <button class="btn" id="rotR" aria-label="Girar 90 grados a la derecha">↻ 90°</button>
+          </div>
+          <div class="row" id="modelRow" hidden>
+            <label class="toggle"><input type="checkbox" id="fLock" checked> Mantener proporciones</label>
+            <button class="btn" id="fUp">Poner de pie / tumbar</button>
+          </div>
+          <div class="colors" id="fColors"></div>
+          <div class="row">
+            <button class="btn" id="fDup">Duplicar</button>
+            <button class="btn danger" id="fDel">Quitar</button>
+            <button class="btn" id="fDone">Listo</button>
+          </div>
+          <p class="note">Arrástralo sobre el suelo para moverlo. Con teclado: <span class="kbd">R</span> gira y <span class="kbd">Supr</span> lo quita.</p>
+        </div>
+      </section>
+
+      <section class="block">
+        <label class="toggle"><input type="checkbox" id="collideIn" checked> Los muebles chocan con paredes y con otros muebles</label>
+        <p class="note">Para llevar un mueble a otra habitación, pásalo por la puerta; si no cabe, gíralo. Las sillas pueden meterse bajo las mesas y las alfombras quedan debajo de todo.</p>
+        <div class="msg" id="furnMsg" aria-live="polite"></div>
+      </section>
+
+      <section class="block">
+        <h2>Añadir mueble</h2>
+        <p class="note">Aparece en el centro de la vista. Acerca la cámara a la estancia antes de añadirlo.</p>
+        <div class="field"><label for="catQ">Buscar en el catálogo</label><input id="catQ" type="search" placeholder="KIVIK, cama, PAX, mesa…" autocomplete="off"></div>
+        <div class="catalog" id="catalog"></div>
+        <p class="empty" id="catEmpty" hidden>No hay nada con ese nombre. Créalo abajo con sus medidas.</p>
+        <details class="custom">
+          <summary>Mueble con medidas propias</summary>
+          <div class="inner">
+            <div class="field"><label for="cName">Nombre</label><input id="cName" type="text" value="Mi mueble" maxlength="40"></div>
+            <div class="grid3 num">
+              <div class="field"><label for="cW">Ancho (cm)</label><input id="cW" type="number" value="120" min="5" max="600"></div>
+              <div class="field"><label for="cD">Fondo (cm)</label><input id="cD" type="number" value="60" min="5" max="600"></div>
+              <div class="field"><label for="cH">Alto (cm)</label><input id="cH" type="number" value="80" min="1" max="300"></div>
+            </div>
+            <div class="field"><label for="cType">Forma</label>
+              <select id="cType">
+                <option value="box">Bloque</option><option value="table">Mesa</option><option value="sofa">Sofá</option>
+                <option value="bed">Cama</option><option value="wardrobe">Armario</option><option value="drawers">Cajonera</option>
+                <option value="shelf">Estantería</option><option value="rug">Alfombra</option>
+              </select></div>
+            <button class="btn primary" id="cAdd">Añadir</button>
+          </div>
+        </details>
+      </section>
+
+      <section class="block">
+        <h2>Modelo 3D</h2>
+        <div class="upload">
+          <p>Carga un mueble en 3D (.glb, .gltf o .obj). Después escribe su ancho real y el resto se ajusta en proporción.</p>
+          <label class="btn primary" for="modelIn">Importar modelo</label>
+          <input type="file" id="modelIn" accept=".glb,.gltf,.obj,model/gltf-binary,model/gltf+json" hidden>
+        </div>
+        <div class="msg" id="modelMsg" aria-live="polite"></div>
+      </section>
+
+      <section class="block">
+        <h2>En la vivienda</h2>
+        <div class="placed" id="placedList"></div>
+        <p class="empty" id="placedEmpty" hidden>Todavía no hay muebles.</p>
+      </section>
+    </div>
+
+    <div class="scroll" id="paneEd" hidden>
+      <section class="block"><ul class="steps" id="edSteps"></ul></section>
+      <section class="block">
+        <h2>Detección automática</h2>
+        <button class="btn primary" id="edDetect">Detectar muros y estancias</button>
+        <p class="note">Busca los muros (rellenos o a doble línea), los huecos de puertas y ventanas y las zonas cerradas. Es un borrador: revísalo y corrige con las herramientas de arriba.</p>
+        <details class="custom"><summary>Ajustes de detección</summary><div class="inner">
+          <div class="range"><div class="top"><label for="edDark">Oscuridad de la línea de muro</label><b id="edDarkOut">100</b></div>
+            <input type="range" id="edDark" min="40" max="200" step="5" value="100">
+            <p class="note">Súbelo si no encuentra muros dibujados en gris; bájalo si confunde muebles con muros. Después pulsa "Volver a detectar".</p></div>
+          <button class="btn" id="edRooms">Volver a buscar estancias</button>
+        </div></details>
+        <div class="msg" id="edMsg" aria-live="polite"></div>
+      </section>
+      <section class="block sel-card" id="edSel" hidden></section>
+      <section class="block">
+        <h2>Escala</h2>
+        <div id="edScaleInfo"></div>
+        <div class="row"><button class="btn" id="edCota">Medir una cota</button></div>
+        <label class="toggle"><input type="checkbox" id="edFixed"> Fijar a mano: <span class="inline"><input type="number" id="edFixedS" step="0.1" min="1" aria-label="Píxeles por metro"> px por metro</span></label>
+      </section>
+      <section class="block">
+        <h2>Alturas</h2>
+        <div class="grid2 num">
+          <div class="field"><label for="edHInt">Techo (cm)</label><input id="edHInt" type="number" min="180" max="500" step="1"></div>
+          <div class="field"><label for="edHDoor">Puertas (cm)</label><input id="edHDoor" type="number" min="150" max="300" step="1"></div>
+        </div>
+      </section>
+      <section class="block">
+        <h2>Imagen del plano</h2>
+        <div class="range"><div class="top"><label for="edOpacity">Intensidad</label></div><input type="range" id="edOpacity" min="0.1" max="1" step="0.05" value="0.55"></div>
+        <label class="toggle"><input type="checkbox" id="edShowImg" checked> Mostrar la imagen debajo</label>
+      </section>
+      <div class="cta"><button class="btn primary" id="ed3d">Ver en 3D</button></div>
+    </div>
+  </aside>
+</div>
+
+<div class="home" id="home" hidden>
+  <div class="wrap">
+    <div class="top">
+      <div><h1>Mis viviendas</h1><p class="lead">Sube el plano de una vivienda (imagen o PDF) y se convierte en un modelo 3D que puedes recorrer, texturizar y amueblar. Todo se guarda en este navegador.</p></div>
+      <div class="acts">
+        <label class="btn primary" for="homeFile">+ Nuevo plano</label><input type="file" id="homeFile" accept="image/*,.pdf,application/pdf" hidden>
+        <label class="btn" for="homeImp">Importar proyecto</label><input type="file" id="homeImp" accept=".json,application/json" hidden>
+        <button class="btn" id="homeClose" hidden>Volver al proyecto</button>
+      </div>
+    </div>
+    <ol class="how">
+      <li><b>Sube el plano</b>Imagen o PDF, a escala. Se detectan los muros, huecos y estancias.</li>
+      <li><b>Revisa</b>Borra lo que sobre y añade lo que falte: muros, puertas, ventanas.</li>
+      <li><b>Pon la escala</b>Escribe los m² de algunas estancias o mide una cota del plano.</li>
+      <li><b>Pasa a 3D</b>Texturas con tus fotos, muebles con medidas reales e IKEA, paseo.</li>
+    </ol>
+    <div class="msg" id="homeMsg" aria-live="polite"></div>
+    <div class="plist" id="homeList"></div>
+    <p class="empty" id="homeEmpty" hidden>Todavía no hay proyectos. Empieza con "Nuevo plano".</p>
+  </div>
+</div>
+
+
+<script src="vendor/three.min.js"></script>
+<script>window.THREE||document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"><\/script>')</script>
+<script src="vendor/GLTFLoader.js"></script>
+<script src="vendor/OBJLoader.js"></script>
+<script>
+if(!THREE.GLTFLoader) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"><\/script>');
+if(!THREE.OBJLoader) document.write('<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"><\/script>');
+</script>
+<script>
+/*__APP_JS__*/
+</script>
+</body>
+</html>
